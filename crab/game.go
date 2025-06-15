@@ -1,17 +1,52 @@
 package crab
 
 import (
+	"bytes"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/isensee-bastian/crab/resources/images/sprites"
+	"image"
 	_ "image/png"
+	"log"
 )
 
 const (
-	ScreenWidth  = 800
-	ScreenHeight = 600
+	ScreenWidth  = 1000
+	ScreenHeight = 800
+
+	xStep          = 192 / 4
+	imagesPerRow   = 4
+	ticksPerSecond = 60
+	ticksPerFrame  = ticksPerSecond / 4
 )
 
+var beachImage *ebiten.Image
+
+var crabFrames []*ebiten.Image
+
+func init() {
+	beachStdImage, _, err := image.Decode(bytes.NewReader(sprites.Beach))
+	if err != nil {
+		log.Fatalf("Error while loading image: %v", err)
+	}
+	beachImage = ebiten.NewImageFromImage(beachStdImage)
+
+	crabStdFrameImages, _, err := image.Decode(bytes.NewReader(sprites.Crab))
+	if err != nil {
+		log.Fatalf("Error while loading image: %v", err)
+	}
+	crabFrameImages := ebiten.NewImageFromImage(crabStdFrameImages)
+
+	for index := 0; index < imagesPerRow; index++ {
+		xOffset := index * xStep
+		crabFrameImage := crabFrameImages.SubImage(image.Rect(xOffset, 0, xOffset+xStep-1, xStep-1))
+		crabFrames = append(crabFrames, ebiten.NewImageFromImage(crabFrameImage))
+	}
+}
+
 type Game struct {
+	frame          int
+	crabFrameIndex int
 }
 
 func NewGame() *Game {
@@ -28,11 +63,26 @@ func (g *Game) Update() error {
 		return ebiten.Termination
 	}
 
+	g.frame = (g.frame + 1) % ticksPerSecond
+	g.crabFrameIndex = g.frame / ticksPerFrame
+
 	return nil
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	drawText(screen, 10, 10, "Hello Crab Game!")
+	{
+		opts := &ebiten.DrawImageOptions{}
+		opts.GeoM.Scale(2.0, 2.0)
+		opts.GeoM.Translate(0, 0)
+		screen.DrawImage(beachImage, opts)
+	}
+	{
+		opts := &ebiten.DrawImageOptions{}
+		opts.GeoM.Scale(2.0, 2.0)
+		opts.GeoM.Translate(10, ScreenHeight/2)
+		screen.DrawImage(crabFrames[g.crabFrameIndex], opts)
+	}
 }
 
 func (g *Game) Layout(width, height int) (screenWidth, screenHeight int) {
