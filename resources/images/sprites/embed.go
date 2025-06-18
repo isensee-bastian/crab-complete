@@ -8,4 +8,7 @@ var (
 
 	//go:embed crab.png
 	Crab []byte
+
+	//go:embed bird.png
+	Bird []byte
 )
