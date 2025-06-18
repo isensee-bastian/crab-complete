@@ -11,4 +11,7 @@ var (
 
 	//go:embed bird.png
 	Bird []byte
+
+	//go:embed fish.png
+	Fish []byte
 )

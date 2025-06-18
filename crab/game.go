@@ -2,25 +2,31 @@ package crab
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/isensee-bastian/crab/resources/images/sprites"
 	"image"
 	_ "image/png"
 	"log"
+	"math/rand/v2"
 )
 
 const (
 	ScreenWidth  = 1000
 	ScreenHeight = 800
 
-	beachScaleFactor = 2
-	birdScaleFactor  = 2
-	walkableMinY     = 180 * beachScaleFactor
-	walkableMaxY     = 320 * beachScaleFactor
+	scoreX       = 5
+	scoreY       = 0
+	walkableMinY = 180 * beachScaleFactor
+	walkableMaxY = 320 * beachScaleFactor
 
-	animationFrameWidth   = 192 / 4
-	animationFrameHeight  = 192 / 4
+	beachScaleFactor   = 2
+	birdScaleFactor    = 2
+	defaultScaleFactor = 1
+
+	spriteWidth           = 192 / 4
+	spriteHeight          = 192 / 4
 	animationFrameColumns = 4
 	crabAnimationRow      = 0
 	birdAnimationRow      = 3
@@ -32,19 +38,25 @@ const (
 
 var (
 	beachImage *ebiten.Image
+	fishImage  *ebiten.Image
 	crabFrames []*ebiten.Image
 	birdFrames []*ebiten.Image
 )
 
 func init() {
-	beachStdImage, _, err := image.Decode(bytes.NewReader(sprites.Beach))
-	if err != nil {
-		log.Fatalf("Error while loading image: %v", err)
-	}
-	beachImage = ebiten.NewImageFromImage(beachStdImage)
+	beachImage = readImage(sprites.Beach)
+	fishImage = readImage(sprites.Fish)
 
 	crabFrames = readAnimationImages(sprites.Crab, crabAnimationRow)
 	birdFrames = readAnimationImages(sprites.Bird, birdAnimationRow)
+}
+
+func readImage(rawImage []byte) *ebiten.Image {
+	stdImage, _, err := image.Decode(bytes.NewReader(rawImage))
+	if err != nil {
+		log.Fatalf("Error while loading image: %v", err)
+	}
+	return ebiten.NewImageFromImage(stdImage)
 }
 
 func readAnimationImages(rawImage []byte, row int) []*ebiten.Image {
@@ -57,12 +69,12 @@ func readAnimationImages(rawImage []byte, row int) []*ebiten.Image {
 	var allFrames []*ebiten.Image
 
 	for index := 0; index < animationFrameColumns; index++ {
-		xOffset := index * animationFrameWidth
+		xOffset := index * spriteWidth
 		frameImage := animationImage.SubImage(image.Rect(
 			xOffset,
-			animationFrameHeight*row,
-			xOffset+animationFrameWidth-1,
-			animationFrameHeight*row+animationFrameHeight-1,
+			spriteHeight*row,
+			xOffset+spriteWidth-1,
+			spriteHeight*row+spriteHeight-1,
 		))
 		allFrames = append(allFrames, ebiten.NewImageFromImage(frameImage))
 	}
@@ -70,25 +82,106 @@ func readAnimationImages(rawImage []byte, row int) []*ebiten.Image {
 	return allFrames
 }
 
+type Sprite struct {
+	x         int             // x coordinate position
+	y         int             // y coordinate position
+	image     *ebiten.Image   // image points to the current animations frame if the sprite is animated
+	animation []*ebiten.Image // animation is only relevant for animated sprites, otherwise nil
+	scale     int             // scale is used to resize the image if it is not set to 1
+}
+
+func (s *Sprite) Width() int {
+	return spriteWidth * s.scale
+}
+
+func (s *Sprite) Height() int {
+	return spriteHeight * s.scale
+}
+
+func (s *Sprite) Rectangle() image.Rectangle {
+	return image.Rectangle{
+		Min: image.Point{
+			X: s.x,
+			Y: s.y,
+		},
+		Max: image.Point{
+			X: s.x + s.Width(),
+			Y: s.y + s.Height(),
+		},
+	}
+}
+
+func (s *Sprite) NextImage(index int) {
+	if index >= len(s.animation) {
+		// Do nothing for static sprites that have no animation (or not enough animation frames).
+		return
+	}
+
+	s.image = s.animation[index]
+}
+
+func (s *Sprite) CollidesWith(other *Sprite) bool {
+	thisRect := s.Rectangle()
+	otherRect := other.Rectangle()
+	overlaps := thisRect.Overlaps(otherRect)
+
+	return overlaps
+}
+
+func (s *Sprite) Draw(screen *ebiten.Image) {
+	opts := &ebiten.DrawImageOptions{}
+	if s.scale != 1 {
+		opts.GeoM.Scale(float64(s.scale), float64(s.scale))
+	}
+	opts.GeoM.Translate(float64(s.x), float64(s.y))
+
+	screen.DrawImage(s.image, opts)
+}
+
 type Game struct {
-	frame          int
-	animationIndex int
+	frame int
+	score int
 
-	crabX int
-	crabY int
+	crab *Sprite
+	bird *Sprite
+	fish *Sprite
+}
 
-	birdX int
-	birdY int
+func (g *Game) UpdateSprites() {
+	g.frame = (g.frame + 1) % ticksPerSecond
+	animationIndex := g.frame / ticksPerFrame
+
+	g.crab.NextImage(animationIndex)
+	g.bird.NextImage(animationIndex)
+	// No need to update the fish sprite as it is not animated.
 }
 
 func NewGame() *Game {
+	fishX, fishY := randomPosition()
+
 	return &Game{
-		frame:          0,
-		animationIndex: 0,
-		crabX:          (ScreenWidth - animationFrameWidth) / 2,
-		crabY:          (ScreenHeight - animationFrameHeight) / 2,
-		birdX:          0,
-		birdY:          (ScreenHeight-animationFrameHeight)/2 + animationFrameHeight*2,
+		frame: 0,
+		score: 0,
+		crab: &Sprite{
+			x:         (ScreenWidth - spriteWidth) / 2,
+			y:         (ScreenHeight - spriteHeight) / 2,
+			image:     crabFrames[0],
+			animation: crabFrames,
+			scale:     defaultScaleFactor,
+		},
+		bird: &Sprite{
+			x:         0,
+			y:         (ScreenHeight-spriteHeight)/2 + spriteHeight*2,
+			image:     birdFrames[0],
+			animation: birdFrames,
+			scale:     birdScaleFactor,
+		},
+		fish: &Sprite{
+			x:     fishX,
+			y:     fishY,
+			image: fishImage,
+			scale: defaultScaleFactor,
+		},
 	}
 }
 
@@ -97,27 +190,38 @@ func (g *Game) Close() {
 }
 
 func (g *Game) moveCrabLeft() {
-	g.crabX = max(g.crabX-moveStepTick, 0)
+	g.crab.x = max(g.crab.x-moveStepTick, 0)
 }
 
 func (g *Game) moveCrabRight() {
-	g.crabX = min(g.crabX+moveStepTick, ScreenWidth-animationFrameWidth-1)
+	g.crab.x = min(g.crab.x+moveStepTick, ScreenWidth-spriteWidth-1)
 }
 
 func (g *Game) moveCrabUp() {
-	g.crabY = max(g.crabY-moveStepTick, walkableMinY)
+	g.crab.y = max(g.crab.y-moveStepTick, walkableMinY)
 }
 
 func (g *Game) moveCrabDown() {
-	g.crabY = min(g.crabY+moveStepTick, walkableMaxY-animationFrameWidth-1)
+	g.crab.y = min(g.crab.y+moveStepTick, walkableMaxY-spriteWidth-1)
 }
 
 func (g *Game) moveBird() {
-	if g.birdX >= ScreenWidth {
-		g.birdX = 0
+	if g.bird.x >= ScreenWidth {
+		g.bird.x = 0
 	} else {
-		g.birdX += moveStepTick
+		g.bird.x += moveStepTick
 	}
+}
+
+// randomPosition returns a random, but walkable position, e.g. for spawning new sprites.
+func randomPosition() (int, int) {
+	maxX := ScreenWidth - spriteWidth
+	maxYOffset := walkableMaxY - walkableMinY - spriteHeight
+
+	x := rand.IntN(maxX)
+	y := rand.IntN(maxYOffset) + walkableMinY
+
+	return x, y
 }
 
 func (g *Game) Update() error {
@@ -126,8 +230,7 @@ func (g *Game) Update() error {
 		return ebiten.Termination
 	}
 
-	g.frame = (g.frame + 1) % ticksPerSecond
-	g.animationIndex = g.frame / ticksPerFrame
+	g.UpdateSprites()
 
 	if inpututil.KeyPressDuration(ebiten.KeyArrowLeft) > 0 {
 		g.moveCrabLeft()
@@ -141,31 +244,31 @@ func (g *Game) Update() error {
 
 	g.moveBird()
 
+	if g.crab.CollidesWith(g.fish) {
+		// Crab got the fish, increase score and spawn a new fish.
+		g.fish.x, g.fish.y = randomPosition()
+		g.score += 1
+	}
+
 	return nil
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	drawText(screen, 10, 10, "Hello Crab Game!")
-	// Draw beach.
+	// Draw static beach.
 	{
 		opts := &ebiten.DrawImageOptions{}
 		opts.GeoM.Scale(beachScaleFactor, beachScaleFactor)
 		opts.GeoM.Translate(0, 0)
 		screen.DrawImage(beachImage, opts)
 	}
-	// Draw crab.
-	{
-		opts := &ebiten.DrawImageOptions{}
-		opts.GeoM.Translate(float64(g.crabX), float64(g.crabY))
-		screen.DrawImage(crabFrames[g.animationIndex], opts)
-	}
-	// Draw bird.
-	{
-		opts := &ebiten.DrawImageOptions{}
-		opts.GeoM.Scale(birdScaleFactor, birdScaleFactor)
-		opts.GeoM.Translate(float64(g.birdX), float64(g.birdY))
-		screen.DrawImage(birdFrames[g.animationIndex], opts)
-	}
+
+	// Draw sprites.
+	g.crab.Draw(screen)
+	g.bird.Draw(screen)
+	g.fish.Draw(screen)
+
+	// Draw score text.
+	drawBigText(screen, scoreX, scoreY, fmt.Sprintf("Score: %d", g.score))
 }
 
 func (g *Game) Layout(width, height int) (screenWidth, screenHeight int) {
