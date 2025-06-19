@@ -42,6 +42,6 @@ All source images are AI generated using the following sites:
 
 * Introduce sound effects.
 * Ensure fish does not spawn directly at crab location or in too near distance.
-* Increase difficulty over time by adding more birds or increasing their speed.
+* Consider a win condition, e.g. when max level has been reached or a max score.
 * Consider adding crabs that follow the players crab to make dodging more difficult over time.
 * Improve collision detection (avoid collision when only outside transparent sprite parts overlap).

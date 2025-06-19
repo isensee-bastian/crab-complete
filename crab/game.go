@@ -22,6 +22,8 @@ const (
 
 	scoreX    = 5
 	scoreY    = 0
+	levelX    = 850
+	levelY    = 0
 	gameOverX = 200
 	gameOverY = walkableMinY
 
@@ -35,9 +37,13 @@ const (
 	crabAnimationRow      = 0
 	birdAnimationRow      = 0
 
-	ticksPerSecond = 60
-	ticksPerFrame  = ticksPerSecond / 4
-	moveStepTick   = 2
+	ticksPerSecond  = 60
+	ticksPerFrame   = ticksPerSecond / 4
+	defaultStepTick = 2
+
+	maxBirdCount      = 3
+	maxBirdStepTick   = 5
+	scoreLevelDivisor = 3
 )
 
 var (
@@ -87,11 +93,12 @@ func readAnimationImages(rawImage []byte, row int) []*ebiten.Image {
 }
 
 type Sprite struct {
-	x         int             // x coordinate position
-	y         int             // y coordinate position
-	image     *ebiten.Image   // image points to the current animations frame if the sprite is animated
-	animation []*ebiten.Image // animation is only relevant for animated sprites, otherwise nil
-	scale     float64         // scale is used to resize the image if it is not set to 1
+	x            int             // x coordinate position
+	y            int             // y coordinate position
+	scale        float64         // scale is used to resize the image if it is not set to 1
+	image        *ebiten.Image   // image points to the current animations frame if the sprite is animated
+	animation    []*ebiten.Image // animation is only relevant for animated sprites, otherwise nil
+	moveStepTick int             // moveStepTick is only relevant for animated sprites and specifies the way to move per tick, 0 for static sprites
 }
 
 func (s *Sprite) Width() int {
@@ -143,11 +150,12 @@ func (s *Sprite) Draw(screen *ebiten.Image) {
 type Game struct {
 	frame int
 	score int
+	level int
 	over  bool
 
-	crab *Sprite
-	bird *Sprite
-	fish *Sprite
+	crab  *Sprite
+	fish  *Sprite
+	birds []*Sprite
 }
 
 func (g *Game) UpdateSprites() {
@@ -155,7 +163,10 @@ func (g *Game) UpdateSprites() {
 	animationIndex := g.frame / ticksPerFrame
 
 	g.crab.NextImage(animationIndex)
-	g.bird.NextImage(animationIndex)
+
+	for _, bird := range g.birds {
+		bird.NextImage(animationIndex)
+	}
 	// No need to update the fish sprite as it is not animated.
 }
 
@@ -175,24 +186,26 @@ func (g *Game) Restart() {
 	fishX, fishY := randomPosition()
 
 	g.crab = &Sprite{
-		x:         (ScreenWidth - spriteWidth) / 2,
-		y:         (ScreenHeight - spriteHeight) / 2,
-		image:     crabFrames[0],
-		animation: crabFrames,
-		scale:     defaultScaleFactor,
+		x:            (ScreenWidth - spriteWidth) / 2,
+		y:            walkableMinY,
+		scale:        defaultScaleFactor,
+		image:        crabFrames[0],
+		animation:    crabFrames,
+		moveStepTick: defaultStepTick,
 	}
-	g.bird = &Sprite{
-		x:         0,
-		y:         (ScreenHeight-spriteHeight)/2 + spriteHeight*2,
-		image:     birdFrames[0],
-		animation: birdFrames,
-		scale:     birdScaleFactor,
-	}
+	g.birds = []*Sprite{{
+		x:            0,
+		y:            walkableMinY + spriteHeight,
+		scale:        birdScaleFactor,
+		image:        birdFrames[0],
+		animation:    birdFrames,
+		moveStepTick: defaultStepTick,
+	}}
 	g.fish = &Sprite{
 		x:     fishX,
 		y:     fishY,
-		image: fishImage,
 		scale: defaultScaleFactor,
+		image: fishImage,
 	}
 }
 
@@ -201,26 +214,76 @@ func (g *Game) Close() {
 }
 
 func (g *Game) moveCrabLeft() {
-	g.crab.x = max(g.crab.x-moveStepTick, 0)
+	g.crab.x = max(g.crab.x-g.crab.moveStepTick, 0)
 }
 
 func (g *Game) moveCrabRight() {
-	g.crab.x = min(g.crab.x+moveStepTick, ScreenWidth-spriteWidth-1)
+	g.crab.x = min(g.crab.x+g.crab.moveStepTick, ScreenWidth-spriteWidth-1)
 }
 
 func (g *Game) moveCrabUp() {
-	g.crab.y = max(g.crab.y-moveStepTick, walkableMinY)
+	g.crab.y = max(g.crab.y-g.crab.moveStepTick, walkableMinY)
 }
 
 func (g *Game) moveCrabDown() {
-	g.crab.y = min(g.crab.y+moveStepTick, walkableMaxY-spriteWidth-1)
+	g.crab.y = min(g.crab.y+g.crab.moveStepTick, walkableMaxY-spriteWidth-1)
 }
 
-func (g *Game) moveBird() {
-	if g.bird.x >= ScreenWidth {
-		g.bird.x = 0
-	} else {
-		g.bird.x += moveStepTick
+func (g *Game) updateLevel() {
+	nextLevel := g.score / scoreLevelDivisor
+
+	if nextLevel > g.level {
+		// Increase difficulty, first by adding more birds, then by accelerating their speed.
+		// Do not increase level and difficulty if we have reached the max count and speed of birds.
+		if g.addBird() || g.speedUpRandomBird() {
+			g.level = nextLevel
+		}
+	}
+}
+
+func (g *Game) addBird() bool {
+	if len(g.birds) >= maxBirdCount {
+		return false
+	}
+
+	g.birds = append(g.birds, &Sprite{
+		x:            0,
+		y:            walkableMinY + spriteHeight*len(g.birds)*2,
+		scale:        birdScaleFactor,
+		image:        birdFrames[0],
+		animation:    birdFrames,
+		moveStepTick: defaultStepTick,
+	})
+
+	return true
+}
+
+func (g *Game) speedUpRandomBird() bool {
+	var upgradableBirds []*Sprite
+
+	for _, bird := range g.birds {
+		if bird.moveStepTick < maxBirdStepTick {
+			upgradableBirds = append(upgradableBirds, bird)
+		}
+	}
+
+	// Skip any more speed increases if all birds are maxed out.
+	if len(upgradableBirds) <= 0 {
+		return false
+	}
+
+	upgradableBirds[rand.IntN(len(upgradableBirds))].moveStepTick += 1
+
+	return true
+}
+
+func (g *Game) moveBirds() {
+	for _, bird := range g.birds {
+		if bird.x >= ScreenWidth {
+			bird.x = 0
+		} else {
+			bird.x += bird.moveStepTick
+		}
 	}
 }
 
@@ -262,17 +325,22 @@ func (g *Game) Update() error {
 		g.moveCrabDown()
 	}
 
-	g.moveBird()
+	g.moveBirds()
 
-	if g.crab.CollidesWith(g.fish) {
-		// Crab got the fish, increase score and spawn a new fish.
-		g.fish.x, g.fish.y = randomPosition()
-		g.score += 1
+	for _, bird := range g.birds {
+		if g.crab.CollidesWith(bird) {
+			// Game over, stop the round.
+			g.over = true
+
+			return nil
+		}
 	}
 
-	if g.crab.CollidesWith(g.bird) {
-		// Game over, stop the round and allow restarting.
-		g.over = true
+	if g.crab.CollidesWith(g.fish) {
+		// Crab got the fish, increase score, spawn a new fish and increase bird difficulty.
+		g.fish.x, g.fish.y = randomPosition()
+		g.score += 1
+		g.updateLevel()
 	}
 
 	return nil
@@ -289,11 +357,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Draw sprites.
 	g.crab.Draw(screen)
-	g.bird.Draw(screen)
 	g.fish.Draw(screen)
 
-	// Draw score text.
+	for _, bird := range g.birds {
+		bird.Draw(screen)
+	}
+
+	// Draw score and level indicator.
 	drawBigText(screen, scoreX, scoreY, color.Black, fmt.Sprintf("Score: %d", g.score))
+	drawBigText(screen, levelX, levelY, color.Black, fmt.Sprintf("Level: %d", g.level))
 
 	// Draw game over info if game has ended.
 	if g.over {
