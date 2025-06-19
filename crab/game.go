@@ -10,6 +10,7 @@ import (
 	"image/color"
 	_ "image/png"
 	"log"
+	"math"
 	"math/rand/v2"
 )
 
@@ -27,9 +28,8 @@ const (
 	gameOverX = 200
 	gameOverY = walkableMinY
 
-	beachScaleFactor   = 2
-	birdScaleFactor    = 1.5
-	defaultScaleFactor = 1
+	beachScaleFactor = 2
+	birdScaleFactor  = 1.5
 
 	spriteWidth           = 192 / 4
 	spriteHeight          = 192 / 4
@@ -95,20 +95,34 @@ func readAnimationImages(rawImage []byte, row int) []*ebiten.Image {
 type Sprite struct {
 	x            int             // x coordinate position
 	y            int             // y coordinate position
-	scale        float64         // scale is used to resize the image if it is not set to 1
+	scale        float64         // scale is used to optionally resize the image if it is not set to 0
+	rotation     float64         // rotation is used to optionally rotate the image in unit radian (up to 2 Pi) if it is not set to 0
 	image        *ebiten.Image   // image points to the current animations frame if the sprite is animated
 	animation    []*ebiten.Image // animation is only relevant for animated sprites, otherwise nil
 	moveStepTick int             // moveStepTick is only relevant for animated sprites and specifies the way to move per tick, 0 for static sprites
 }
 
 func (s *Sprite) Width() int {
+	if s.scale == 0 {
+		// A default zero scale implies no scaling. Hence, the original image size is used.
+		return spriteWidth
+	}
+
 	return int(spriteWidth * s.scale)
 }
 
 func (s *Sprite) Height() int {
+	if s.scale == 0 {
+		// A default zero scale implies no scaling. Hence, the original image size is used.
+		return spriteHeight
+	}
+
 	return int(spriteHeight * s.scale)
 }
 
+// Rectangle returns the images position in the form of a rectangle. Note that any potential rotation is not included
+// here. Hence, result usage should not depend on any actual rotation unless the rotation position matches the (scaled)
+// image width and size (e.g. in case of a 90, 180 or 270-degree rotation and an image where width is equal to height).
 func (s *Sprite) Rectangle() image.Rectangle {
 	return image.Rectangle{
 		Min: image.Point{
@@ -141,7 +155,20 @@ func (s *Sprite) CollidesWith(other *Sprite) bool {
 
 func (s *Sprite) Draw(screen *ebiten.Image) {
 	opts := &ebiten.DrawImageOptions{}
-	opts.GeoM.Scale(s.scale, s.scale)
+
+	if s.scale != 0 {
+		opts.GeoM.Scale(s.scale, s.scale)
+	}
+
+	if s.rotation != 0 {
+		// Note that we must move the images center to the screens upper left corner before rotating. This is because
+		// the origin point for rotating is the upper left corner. See the ebitengine documentation and example project
+		// 'rotate' for details.
+		opts.GeoM.Translate(-float64(s.Width())/2, -float64(s.Height())/2)
+		radian := s.rotation * 2 * math.Pi / 360
+		opts.GeoM.Rotate(radian)
+	}
+
 	opts.GeoM.Translate(float64(s.x), float64(s.y))
 
 	screen.DrawImage(s.image, opts)
@@ -188,7 +215,6 @@ func (g *Game) Restart() {
 	g.crab = &Sprite{
 		x:            (ScreenWidth - spriteWidth) / 2,
 		y:            walkableMinY,
-		scale:        defaultScaleFactor,
 		image:        crabFrames[0],
 		animation:    crabFrames,
 		moveStepTick: defaultStepTick,
@@ -204,7 +230,6 @@ func (g *Game) Restart() {
 	g.fish = &Sprite{
 		x:     fishX,
 		y:     fishY,
-		scale: defaultScaleFactor,
 		image: fishImage,
 	}
 }
@@ -329,8 +354,9 @@ func (g *Game) Update() error {
 
 	for _, bird := range g.birds {
 		if g.crab.CollidesWith(bird) {
-			// Game over, stop the round.
+			// Game over, turn the crab upside down as a visual indicator and stop the round (stop moving etc.).
 			g.over = true
+			g.crab.rotation = 180
 
 			return nil
 		}
