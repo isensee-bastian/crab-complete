@@ -7,6 +7,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/isensee-bastian/crab/resources/images/sprites"
 	"image"
+	"image/color"
 	_ "image/png"
 	"log"
 	"math/rand/v2"
@@ -16,20 +17,23 @@ const (
 	ScreenWidth  = 1000
 	ScreenHeight = 800
 
-	scoreX       = 5
-	scoreY       = 0
 	walkableMinY = 180 * beachScaleFactor
 	walkableMaxY = 320 * beachScaleFactor
 
+	scoreX    = 5
+	scoreY    = 0
+	gameOverX = 200
+	gameOverY = walkableMinY
+
 	beachScaleFactor   = 2
-	birdScaleFactor    = 2
+	birdScaleFactor    = 1.5
 	defaultScaleFactor = 1
 
 	spriteWidth           = 192 / 4
 	spriteHeight          = 192 / 4
 	animationFrameColumns = 4
 	crabAnimationRow      = 0
-	birdAnimationRow      = 3
+	birdAnimationRow      = 0
 
 	ticksPerSecond = 60
 	ticksPerFrame  = ticksPerSecond / 4
@@ -87,15 +91,15 @@ type Sprite struct {
 	y         int             // y coordinate position
 	image     *ebiten.Image   // image points to the current animations frame if the sprite is animated
 	animation []*ebiten.Image // animation is only relevant for animated sprites, otherwise nil
-	scale     int             // scale is used to resize the image if it is not set to 1
+	scale     float64         // scale is used to resize the image if it is not set to 1
 }
 
 func (s *Sprite) Width() int {
-	return spriteWidth * s.scale
+	return int(spriteWidth * s.scale)
 }
 
 func (s *Sprite) Height() int {
-	return spriteHeight * s.scale
+	return int(spriteHeight * s.scale)
 }
 
 func (s *Sprite) Rectangle() image.Rectangle {
@@ -130,9 +134,7 @@ func (s *Sprite) CollidesWith(other *Sprite) bool {
 
 func (s *Sprite) Draw(screen *ebiten.Image) {
 	opts := &ebiten.DrawImageOptions{}
-	if s.scale != 1 {
-		opts.GeoM.Scale(float64(s.scale), float64(s.scale))
-	}
+	opts.GeoM.Scale(s.scale, s.scale)
 	opts.GeoM.Translate(float64(s.x), float64(s.y))
 
 	screen.DrawImage(s.image, opts)
@@ -141,6 +143,7 @@ func (s *Sprite) Draw(screen *ebiten.Image) {
 type Game struct {
 	frame int
 	score int
+	over  bool
 
 	crab *Sprite
 	bird *Sprite
@@ -157,31 +160,39 @@ func (g *Game) UpdateSprites() {
 }
 
 func NewGame() *Game {
+	game := &Game{}
+	game.Restart()
+
+	return game
+}
+
+// Restart resets all game state to its initial values.
+func (g *Game) Restart() {
+	g.frame = 0
+	g.score = 0
+	g.over = false
+
 	fishX, fishY := randomPosition()
 
-	return &Game{
-		frame: 0,
-		score: 0,
-		crab: &Sprite{
-			x:         (ScreenWidth - spriteWidth) / 2,
-			y:         (ScreenHeight - spriteHeight) / 2,
-			image:     crabFrames[0],
-			animation: crabFrames,
-			scale:     defaultScaleFactor,
-		},
-		bird: &Sprite{
-			x:         0,
-			y:         (ScreenHeight-spriteHeight)/2 + spriteHeight*2,
-			image:     birdFrames[0],
-			animation: birdFrames,
-			scale:     birdScaleFactor,
-		},
-		fish: &Sprite{
-			x:     fishX,
-			y:     fishY,
-			image: fishImage,
-			scale: defaultScaleFactor,
-		},
+	g.crab = &Sprite{
+		x:         (ScreenWidth - spriteWidth) / 2,
+		y:         (ScreenHeight - spriteHeight) / 2,
+		image:     crabFrames[0],
+		animation: crabFrames,
+		scale:     defaultScaleFactor,
+	}
+	g.bird = &Sprite{
+		x:         0,
+		y:         (ScreenHeight-spriteHeight)/2 + spriteHeight*2,
+		image:     birdFrames[0],
+		animation: birdFrames,
+		scale:     birdScaleFactor,
+	}
+	g.fish = &Sprite{
+		x:     fishX,
+		y:     fishY,
+		image: fishImage,
+		scale: defaultScaleFactor,
 	}
 }
 
@@ -229,6 +240,15 @@ func (g *Game) Update() error {
 		// Signal that the game shall terminate normally.
 		return ebiten.Termination
 	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+		// Restart the game, this is also possible if it is not over yet.
+		g.Restart()
+		return nil
+	}
+	if g.over {
+		// Game over, do not update the scene until the game is restarted.
+		return nil
+	}
 
 	g.UpdateSprites()
 
@@ -250,6 +270,11 @@ func (g *Game) Update() error {
 		g.score += 1
 	}
 
+	if g.crab.CollidesWith(g.bird) {
+		// Game over, stop the round and allow restarting.
+		g.over = true
+	}
+
 	return nil
 }
 
@@ -268,7 +293,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.fish.Draw(screen)
 
 	// Draw score text.
-	drawBigText(screen, scoreX, scoreY, fmt.Sprintf("Score: %d", g.score))
+	drawBigText(screen, scoreX, scoreY, color.Black, fmt.Sprintf("Score: %d", g.score))
+
+	// Draw game over info if game has ended.
+	if g.over {
+		drawBigText(screen, gameOverX, gameOverY, color.Black, fmt.Sprintf("Game Over! (Enter: restart, Esc: exit)"))
+	}
 }
 
 func (g *Game) Layout(width, height int) (screenWidth, screenHeight int) {

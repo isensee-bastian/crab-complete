@@ -5,6 +5,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
+	"image/color"
 	"log"
 )
 
@@ -25,20 +26,21 @@ func init() {
 	}
 	bigTextFace = &text.GoTextFace{
 		Source: source,
-		Size:   32,
+		Size:   36,
 	}
 }
 
-func drawText(screen *ebiten.Image, x, y int, content string) {
-	drawTextWithFace(screen, x, y, content, normalTextFace)
+func drawText(screen *ebiten.Image, x, y int, color color.Color, content string) {
+	drawTextWithFace(screen, x, y, color, content, normalTextFace)
 }
 
-func drawBigText(screen *ebiten.Image, x, y int, content string) {
-	drawTextWithFace(screen, x, y, content, bigTextFace)
+func drawBigText(screen *ebiten.Image, x, y int, color color.Color, content string) {
+	drawTextWithFace(screen, x, y, color, content, bigTextFace)
 }
 
-func drawTextWithFace(screen *ebiten.Image, x, y int, content string, textFace *text.GoTextFace) {
+func drawTextWithFace(screen *ebiten.Image, x, y int, color color.Color, content string, textFace *text.GoTextFace) {
 	op := &text.DrawOptions{}
 	op.GeoM.Translate(float64(x), float64(y))
+	op.ColorScale.ScaleWithColor(color)
 	text.Draw(screen, content, textFace, op)
 }

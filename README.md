@@ -40,8 +40,8 @@ All source images are AI generated using the following sites:
 
 ### Improvement Ideas
 
-* Introduce collision with seagull, i.e. game over for the crab.
 * Introduce sound effects.
 * Ensure fish does not spawn directly at crab location or in too near distance.
 * Increase difficulty over time by adding more birds or increasing their speed.
 * Consider adding crabs that follow the players crab to make dodging more difficult over time.
+* Improve collision detection (avoid collision when only outside transparent sprite parts overlap).
