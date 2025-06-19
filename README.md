@@ -2,7 +2,7 @@
 
 ### About the Game
 
-Todo
+You are a crab on a sunny day at the beach. Suddenly, you feel a strong appetite for dead fish. Hence, you start looking around for delicious fish to devour. Easier said than done, since those nasty seagulls are strolling around here. Avoid getting eaten yourself by dodging the birds and eat as much fish as you can to make this a perfect day.
 
 A simple 2D game built with Golang and Ebitengine.
 
@@ -14,7 +14,8 @@ A simple 2D game built with Golang and Ebitengine.
 
 ### How to Play
 
-Todo
+* Use the arrow keys to move the crab left, right, up or down.
+* For exiting the game, press the escape key.
 
 ### Troubleshooting
 
@@ -26,7 +27,9 @@ You should hear some audio effects while playing the gameI. f you don't hear any
 
 ### Media Sources
 
-Todo
+All source images are AI generated using the following sites:
+* [Retro Diffusion](https://www.retrodiffusion.ai/) for generating pixel art images, especially animations.
+* [ideogram](https://ideogram.ai) for general image generation, including some pixel art images.
 
 ### Tools Used
 
@@ -37,4 +40,8 @@ Todo
 
 ### Improvement Ideas
 
-Todo
+* Introduce collision with seagull, i.e. game over for the crab.
+* Introduce sound effects.
+* Ensure fish does not spawn directly at crab location or in too near distance.
+* Increase difficulty over time by adding more birds or increasing their speed.
+* Consider adding crabs that follow the players crab to make dodging more difficult over time.
