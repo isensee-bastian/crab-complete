@@ -47,3 +47,4 @@ All source images are AI generated using the following sites:
 * Improve collision detection (avoid collision when only outside transparent sprite parts overlap).
 * Check rotation mechanism in more detail.
 * Consider adaption and deployment to other platforms (e.g. web, mobile) for testing.
+* Consider static objects that cannot be walked through as additional difficulty.

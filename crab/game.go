@@ -21,10 +21,10 @@ const (
 	walkableMinY = 180 * beachScaleFactor
 	walkableMaxY = 320 * beachScaleFactor
 
-	scoreX    = 5
-	scoreY    = 0
-	levelX    = 850
-	levelY    = 0
+	scoreX    = 10
+	scoreY    = 740
+	levelX    = 780
+	levelY    = 740
 	gameOverX = 200
 	gameOverY = walkableMinY
 
@@ -44,6 +44,9 @@ const (
 	maxBirdCount      = 3
 	maxBirdStepTick   = 5
 	scoreLevelDivisor = 3
+
+	// maxLevel represents the maximum difficulty. Each level adds one bird count or one bird speed.
+	maxLevel = maxBirdCount + (maxBirdStepTick-defaultStepTick)*maxBirdCount
 )
 
 var (
@@ -208,6 +211,7 @@ func NewGame() *Game {
 func (g *Game) Restart() {
 	g.frame = 0
 	g.score = 0
+	g.level = 1
 	g.over = false
 
 	fishX, fishY := randomPosition()
@@ -219,19 +223,13 @@ func (g *Game) Restart() {
 		animation:    crabFrames,
 		moveStepTick: defaultStepTick,
 	}
-	g.birds = []*Sprite{{
-		x:            0,
-		y:            walkableMinY + spriteHeight,
-		scale:        birdScaleFactor,
-		image:        birdFrames[0],
-		animation:    birdFrames,
-		moveStepTick: defaultStepTick,
-	}}
 	g.fish = &Sprite{
 		x:     fishX,
 		y:     fishY,
 		image: fishImage,
 	}
+	// Start with zero birds and increase count with rising difficulty (as well as their speed).
+	g.birds = []*Sprite{}
 }
 
 func (g *Game) Close() {
@@ -255,13 +253,15 @@ func (g *Game) moveCrabDown() {
 }
 
 func (g *Game) updateLevel() {
-	nextLevel := g.score / scoreLevelDivisor
+	// Add offset 1 since level (difficulty shall start counting at 1).
+	nextLevel := (g.score / scoreLevelDivisor) + 1
 
-	if nextLevel > g.level {
+	if nextLevel > g.level && nextLevel < maxLevel {
 		// Increase difficulty, first by adding more birds, then by accelerating their speed.
 		// Do not increase level and difficulty if we have reached the max count and speed of birds.
 		if g.addBird() || g.speedUpRandomBird() {
 			g.level = nextLevel
+			log.Printf("Next level reached: %d\n", nextLevel)
 		}
 	}
 }
@@ -391,7 +391,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Draw score and level indicator.
 	drawBigText(screen, scoreX, scoreY, color.Black, fmt.Sprintf("Score: %d", g.score))
-	drawBigText(screen, levelX, levelY, color.Black, fmt.Sprintf("Level: %d", g.level))
+	drawBigText(screen, levelX, levelY, color.Black, fmt.Sprintf("Level: %d/%d", g.level, maxLevel))
 
 	// Draw game over info if game has ended.
 	if g.over {
