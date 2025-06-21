@@ -31,6 +31,11 @@ const (
 	beachScaleFactor = 2
 	birdScaleFactor  = 1.5
 
+	// collisionOverlapThreshold configures how much of a sprites area must overlap with another sprite before
+	// it is considered an actual collision. This avoids superficial collisions due to overlapping (often transparent)
+	// border areas which are not clearly visible as a collision.
+	collisionOverlapThreshold = 0.25
+
 	spriteWidth           = 192 / 4
 	spriteHeight          = 192 / 4
 	animationFrameColumns = 4
@@ -151,9 +156,26 @@ func (s *Sprite) NextImage(index int) {
 func (s *Sprite) CollidesWith(other *Sprite) bool {
 	thisRect := s.Rectangle()
 	otherRect := other.Rectangle()
-	overlaps := thisRect.Overlaps(otherRect)
+	overlapRect := thisRect.Intersect(otherRect)
 
-	return overlaps
+	if overlapRect.Empty() {
+		// No overlap at all, hence no collision.
+		return false
+	}
+
+	// Calculate overlapping area and apply a threshold before considering it a collision. This is to avoid collisions
+	// due to minimal overlapping areas that are often transparent around the images border and therefore not clearly
+	// visible as such.
+	thisArea := thisRect.Dx() * thisRect.Dy()
+	overlapArea := overlapRect.Dx() * overlapRect.Dy()
+
+	// For simplicity, use this sprites area as the basis for calculating the actual threshold. One could also
+	// pick the smallest area of both sprites or similar.
+	if overlapArea >= int(float64(thisArea)*collisionOverlapThreshold) {
+		return true
+	}
+
+	return false
 }
 
 func (s *Sprite) Draw(screen *ebiten.Image) {

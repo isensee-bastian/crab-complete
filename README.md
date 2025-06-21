@@ -42,9 +42,8 @@ All source images are AI generated using the following sites:
 
 * Introduce sound effects (crab, bird, fish, ocean).
 * Ensure fish does not spawn directly at crab location or in too near distance.
-* Consider a win condition, e.g. when max level has been reached or a max score.
 * Consider adding crabs that follow the players crab to make dodging more difficult over time.
-* Improve collision detection (avoid collision when only outside transparent sprite parts overlap).
-* Check rotation mechanism in more detail.
-* Consider adaption and deployment to other platforms (e.g. web, mobile) for testing.
+* Consider adaption and deployment to other platforms (e.g. web, mobile) and touch / gamepad support for testing.
 * Consider static objects that cannot be walked through as additional difficulty.
+* Check rotation mechanism in more detail.
+* Consider a win condition, e.g. when max level has been reached or a max score.
