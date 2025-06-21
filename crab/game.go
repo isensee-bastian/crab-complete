@@ -6,6 +6,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/isensee-bastian/crab/resources/images/sprites"
+	"github.com/isensee-bastian/crab/resources/sounds"
 	"image"
 	"image/color"
 	_ "image/png"
@@ -208,6 +209,9 @@ type Game struct {
 	crab  *Sprite
 	fish  *Sprite
 	birds []*Sprite
+
+	overPlayer   *AudioPlayer
+	pickupPlayer *AudioPlayer
 }
 
 func (g *Game) UpdateSprites() {
@@ -223,7 +227,10 @@ func (g *Game) UpdateSprites() {
 }
 
 func NewGame() *Game {
-	game := &Game{}
+	game := &Game{
+		overPlayer:   newMp3AudioPlayer(sounds.Jab),
+		pickupPlayer: newMp3AudioPlayer(sounds.ItemPickup),
+	}
 	game.Restart()
 
 	return game
@@ -252,6 +259,8 @@ func (g *Game) Restart() {
 	}
 	// Start with zero birds and increase count with rising difficulty (as well as their speed).
 	g.birds = []*Sprite{}
+
+	// Note that there is no need to recreate the audio players, we can simply reuse them.
 }
 
 func (g *Game) Close() {
@@ -283,7 +292,6 @@ func (g *Game) updateLevel() {
 		// Do not increase level and difficulty if we have reached the max count and speed of birds.
 		if g.addBird() || g.speedUpRandomBird() {
 			g.level = nextLevel
-			log.Printf("Next level reached: %d\n", nextLevel)
 		}
 	}
 }
@@ -376,18 +384,21 @@ func (g *Game) Update() error {
 
 	for _, bird := range g.birds {
 		if g.crab.CollidesWith(bird) {
-			// Game over, turn the crab upside down as a visual indicator and stop the round (stop moving etc.).
+			// Game over, turn the crab upside down as a visual indicator, play a sound and stop the round (stop moving etc.).
 			g.over = true
 			g.crab.rotation = 180
+			g.overPlayer.Replay()
 
 			return nil
 		}
 	}
 
 	if g.crab.CollidesWith(g.fish) {
-		// Crab got the fish, increase score, spawn a new fish and increase bird difficulty.
-		g.fish.x, g.fish.y = randomPosition()
+		// Crab got the fish, increase score, play a sound, spawn a new fish and increase bird difficulty.
 		g.score += 1
+		g.pickupPlayer.Replay()
+
+		g.fish.x, g.fish.y = randomPosition()
 		g.updateLevel()
 	}
 

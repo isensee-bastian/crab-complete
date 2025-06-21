@@ -2,16 +2,13 @@ package crab
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
 	"log"
-	"os"
 )
 
 const (
-	soundBasePath = "resources/sounds/"
-	sampleRate    = 48000
+	sampleRate = 48000
 )
 
 var audioContext *audio.Context
@@ -26,13 +23,8 @@ type AudioPlayer struct {
 	*audio.Player
 }
 
-func newMp3AudioPlayer(fileName string) *AudioPlayer {
-	sellSoundRaw, err := os.ReadFile(fmt.Sprintf("%s/%s", soundBasePath, fileName))
-	if err != nil {
-		log.Fatalf("Failed to read sound file: %v", err)
-	}
-
-	sellSound, err := mp3.DecodeF32(bytes.NewReader(sellSoundRaw))
+func newMp3AudioPlayer(rawSound []byte) *AudioPlayer {
+	sellSound, err := mp3.DecodeF32(bytes.NewReader(rawSound))
 	if err != nil {
 		log.Fatalf("Failed to decode raw sound as mp3: %v", err)
 	}
