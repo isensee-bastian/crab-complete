@@ -24,7 +24,7 @@ const (
 
 	scoreX    = 10
 	scoreY    = 740
-	levelX    = 780
+	levelX    = 760
 	levelY    = 740
 	gameOverX = 200
 	gameOverY = walkableMinY
@@ -264,7 +264,8 @@ func (g *Game) Restart() {
 }
 
 func (g *Game) Close() {
-	// Nothing to do for cleanup so far (implement when needed).
+	g.pickupPlayer.Close()
+	g.overPlayer.Close()
 }
 
 func (g *Game) moveCrabLeft() {
