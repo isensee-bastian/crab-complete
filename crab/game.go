@@ -373,11 +373,14 @@ func (g *Game) Update() error {
 
 	if inpututil.KeyPressDuration(ebiten.KeyArrowLeft) > 0 {
 		g.moveCrabLeft()
-	} else if inpututil.KeyPressDuration(ebiten.KeyArrowRight) > 0 {
+	}
+	if inpututil.KeyPressDuration(ebiten.KeyArrowRight) > 0 {
 		g.moveCrabRight()
-	} else if inpututil.KeyPressDuration(ebiten.KeyArrowUp) > 0 {
+	}
+	if inpututil.KeyPressDuration(ebiten.KeyArrowUp) > 0 {
 		g.moveCrabUp()
-	} else if inpututil.KeyPressDuration(ebiten.KeyArrowDown) > 0 {
+	}
+	if inpututil.KeyPressDuration(ebiten.KeyArrowDown) > 0 {
 		g.moveCrabDown()
 	}
 
