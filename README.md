@@ -17,6 +17,23 @@ A simple 2D game built with Golang and Ebitengine.
 * Use the arrow keys to move the crab left, right, up or down.
 * For exiting the game, press the escape key.
 
+### Slides / Documentation
+
+A set of slides has been created for sharing knowledge gained from this project. See the `slides` folder and open the
+html file in a browser to watch documented content. The actual slide content is maintained in a markdown file in the
+same folder and converted using [Marp CLI](https://github.com/marp-team/marp-cli). Ensure that `npx` is installed
+to run `Marp` if you want to convert from markdown to slides.
+
+Subsequent commands can be used to covert slides from markdown to html format (assumes you are in the slides/ directory):
+```
+# Watch for changes to get continuous feedback on changes (open the resulting html file in a browser).
+npx @marp-team/marp-cli@latest -w slides.md
+
+# Or just convert to html output (other formats available too, see the Marp documentation):
+npx @marp-team/marp-cli@latest slides.md -o slides.html
+```
+
+
 ### Troubleshooting
 
 #### No Audio
@@ -37,6 +54,7 @@ All source images are AI generated using the following sites:
 * [Ebitengine](https://ebitengine.org/) for building a 2D game.
 * [GIMP](https://www.gimp.org) for adapting images from source pictures.
 * [ffmpeg](https://ffmpeg.org/) for adapting audio properties like sample size and volume.
+* [Marp](https://marp.app/) for creating slides to document and present gained knowledge.
 
 ### Improvement Ideas
 
